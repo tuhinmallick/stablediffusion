@@ -75,9 +75,7 @@ class PriorDiffusionModel(torch.nn.Module):
         diffusion_kwargs = copy.deepcopy(self._diffusion_kwargs)
         diffusion_kwargs.update(timestep_respacing=timestep_respacing)
         diffusion = create_gaussian_diffusion(**diffusion_kwargs)
-        sample_fn = diffusion.ddim_sample_loop if use_ddim else diffusion.p_sample_loop
-
-        return sample_fn
+        return diffusion.ddim_sample_loop if use_ddim else diffusion.p_sample_loop
 
     def get_causal_mask(self):
         seq_len = self._model_conf.text_ctx + 4

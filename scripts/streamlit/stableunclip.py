@@ -40,7 +40,7 @@ def get_obj_from_str(string, reload=False):
 
 
 def instantiate_from_config(config):
-    if not "target" in config:
+    if "target" not in config:
         raise KeyError("Expected key `target` to instantiate.")
     return get_obj_from_str(config["target"])(**config.get("params", dict()))
 
@@ -49,7 +49,7 @@ def get_interactive_image(key=None):
     image = st.file_uploader("Input", type=["jpg", "JPEG", "png"], key=key)
     if image is not None:
         image = Image.open(image)
-        if not image.mode == "RGB":
+        if image.mode != "RGB":
             image = image.convert("RGB")
         return image
 
@@ -108,8 +108,8 @@ def sample(
 
     with precision_scope("cuda"):
         with model.ema_scope():
-            all_samples = list()
-            for n in trange(n_runs, desc="Sampling"):
+            all_samples = []
+            for _ in trange(n_runs, desc="Sampling"):
                 shape = [C, H // f, W // f]
                 if not only_adm_cond:
                     uc = None
@@ -125,9 +125,8 @@ def sample(
                     if adm_uc is None:
                         st.warning("Not guiding via c_adm")
                         adm_uc = adm_cond
-                    else:
-                        if adm_uc.shape[0] == 1:
-                            adm_uc = repeat(adm_uc, '1 ... -> b ...', b=batch_size)
+                    elif adm_uc.shape[0] == 1:
+                        adm_uc = repeat(adm_uc, '1 ... -> b ...', b=batch_size)
                     if not only_adm_cond:
                         c = {"c_crossattn": [c], "c_adm": adm_cond}
                         uc = {"c_crossattn": [uc], "c_adm": adm_uc}
@@ -174,14 +173,12 @@ def sample(
 
 
 def make_oscillating_guidance_schedule(num_steps, max_weight=15., min_weight=1.):
-    schedule = list()
+    schedule = []
     for i in range(num_steps):
-        if float(i / num_steps) < 0.1:
+        if float(i / num_steps) < 0.1 or i % 2 != 0:
             schedule.append(max_weight)
-        elif i % 2 == 0:
-            schedule.append(min_weight)
         else:
-            schedule.append(max_weight)
+            schedule.append(min_weight)
     print(f"OSCILLATING GUIDANCE SCHEDULE: \n {schedule}")
     return schedule
 
@@ -195,7 +192,7 @@ def torch2np(x):
 @st.cache(allow_output_mutation=True, suppress_st_warning=True)
 def init(version="Stable unCLIP-L", load_karlo_prior=False):
     state = dict()
-    if not "model" in state:
+    if "model" not in state:
         if version == "Stable unCLIP-L":
             config = "configs/stable-diffusion/v2-1-stable-unclip-l-inference.yaml"
             ckpt = "checkpoints/sd21-unclip-l.ckpt"

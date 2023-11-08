@@ -24,8 +24,7 @@ def initialize_model(config, ckpt):
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     model = model.to(device)
-    sampler = DDIMSampler(model)
-    return sampler
+    return DDIMSampler(model)
 
 
 def make_batch_sd(
@@ -61,12 +60,11 @@ def paint(sampler, image, prompt, t_enc, seed, scale, num_samples=1, callback=No
     wm_encoder = WatermarkEncoder()
     wm_encoder.set_watermark('bytes', wm.encode('utf-8'))
 
-    with torch.no_grad(),\
-            torch.autocast("cuda"):
+    with (torch.no_grad(), torch.autocast("cuda")):
         batch = make_batch_sd(image, txt=prompt, device=device, num_samples=num_samples)
         z = model.get_first_stage_encoding(model.encode_first_stage(batch[model.first_stage_key]))  # move to latent space
         c = model.cond_stage_model.encode(batch["txt"])
-        c_cat = list()
+        c_cat = []
         for ck in model.concat_keys:
             cc = batch[ck]
             cc = model.depth_model(cc)

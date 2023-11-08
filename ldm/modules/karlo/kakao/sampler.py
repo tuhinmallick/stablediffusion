@@ -72,7 +72,7 @@ class T2ISampler(BaseSampler):
 
         tok, mask = tokenizer.padded_tokens_and_mask(prompts_batch, max_txt_length)
         cf_token, cf_mask = tokenizer.padded_tokens_and_mask([""], max_txt_length)
-        if not (cf_token.shape == tok.shape):
+        if cf_token.shape != tok.shape:
             cf_token = cf_token.expand(tok.shape[0], -1)
             cf_mask = cf_mask.expand(tok.shape[0], -1)
 
@@ -99,7 +99,7 @@ class T2ISampler(BaseSampler):
             progressive_mode=None,
     ) -> Iterator[torch.Tensor]:
         assert progressive_mode in ("loop", "stage", "final")
-        with torch.no_grad(), torch.cuda.amp.autocast():
+        with (torch.no_grad(), torch.cuda.amp.autocast()):
             (
                 prompts_batch,
                 prior_cf_scales_batch,
@@ -134,7 +134,7 @@ class T2ISampler(BaseSampler):
             )
 
             images_64 = None
-            for k, out in enumerate(images_64_outputs):
+            for out in images_64_outputs:
                 images_64 = out
                 if progressive_mode == "loop":
                     yield torch.clamp(out * 0.5 + 0.5, 0.0, 1.0)
@@ -154,7 +154,7 @@ class T2ISampler(BaseSampler):
                 images_256, timestep_respacing=self._sr_sm
             )
 
-            for k, out in enumerate(images_256_outputs):
+            for out in images_256_outputs:
                 images_256 = out
                 if progressive_mode == "loop":
                     yield torch.clamp(out * 0.5 + 0.5, 0.0, 1.0)
@@ -219,7 +219,7 @@ class PriorSampler(BaseSampler):
 
         tok, mask = tokenizer.padded_tokens_and_mask(prompts_batch, max_txt_length)
         cf_token, cf_mask = tokenizer.padded_tokens_and_mask([""], max_txt_length)
-        if not (cf_token.shape == tok.shape):
+        if cf_token.shape != tok.shape:
             cf_token = cf_token.expand(tok.shape[0], -1)
             cf_mask = cf_mask.expand(tok.shape[0], -1)
 
@@ -246,7 +246,7 @@ class PriorSampler(BaseSampler):
             progressive_mode=None,
     ) -> Iterator[torch.Tensor]:
         assert progressive_mode in ("loop", "stage", "final")
-        with torch.no_grad(), torch.cuda.amp.autocast():
+        with (torch.no_grad(), torch.cuda.amp.autocast()):
             (
                 prompts_batch,
                 prior_cf_scales_batch,
@@ -261,12 +261,10 @@ class PriorSampler(BaseSampler):
             )
 
             """ Transform CLIP text feature into image feature """
-            img_feat = self._prior(
+            yield self._prior(
                 txt_feat,
                 txt_feat_seq,
                 mask,
                 prior_cf_scales_batch,
                 timestep_respacing=self._prior_sm,
             )
-
-            yield img_feat

@@ -25,8 +25,7 @@ def initialize_model(config, ckpt):
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     model = model.to(device)
-    sampler = DDIMSampler(model)
-    return sampler
+    return DDIMSampler(model)
 
 
 def make_batch_sd(
@@ -64,11 +63,10 @@ def paint(sampler, image, prompt, seed, scale, h, w, steps, num_samples=1, callb
     wm = "SDV2"
     wm_encoder = WatermarkEncoder()
     wm_encoder.set_watermark('bytes', wm.encode('utf-8'))
-    with torch.no_grad(),\
-            torch.autocast("cuda"):
+    with (torch.no_grad(), torch.autocast("cuda")):
         batch = make_batch_sd(image, txt=prompt, device=device, num_samples=num_samples)
         c = model.cond_stage_model.encode(batch["txt"])
-        c_cat = list()
+        c_cat = []
         if isinstance(model, LatentUpscaleFinetuneDiffusion):
             for ck in model.concat_keys:
                 cc = batch[ck]

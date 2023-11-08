@@ -70,10 +70,10 @@ class Text2ImProgressiveModel(torch.nn.Module):
             )
             assert 2 ** (len(channel_mult) + 2) == image_size
 
-        attention_ds = []
-        for res in self._model_conf.attention_resolutions.split(","):
-            attention_ds.append(image_size // int(res))
-
+        attention_ds = [
+            image_size // int(res)
+            for res in self._model_conf.attention_resolutions.split(",")
+        ]
         return PLMImUNet(
             text_ctx=self._model_conf.text_ctx,
             xf_width=self._model_conf.xf_width,
@@ -104,13 +104,11 @@ class Text2ImProgressiveModel(torch.nn.Module):
         diffusion_kwargs = copy.deepcopy(self._diffusion_kwargs)
         diffusion_kwargs.update(timestep_respacing=timestep_respacing)
         diffusion = create_gaussian_diffusion(**diffusion_kwargs)
-        sample_fn = (
+        return (
             diffusion.ddim_sample_loop_progressive
             if use_ddim
             else diffusion.p_sample_loop_progressive
         )
-
-        return sample_fn
 
     def forward(
         self,

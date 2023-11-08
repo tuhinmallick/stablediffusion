@@ -84,5 +84,4 @@ class ImprovedSupRes64to256ProgressiveModel(torch.nn.Module):
             **kwargs,
         )
         for x in sample_outputs:
-            sample = x["sample"]
-            yield sample
+            yield x["sample"]

@@ -25,8 +25,7 @@ def initialize_model(config, ckpt):
     device = torch.device(
         "cuda") if torch.cuda.is_available() else torch.device("cpu")
     model = model.to(device)
-    sampler = DDIMSampler(model)
-    return sampler
+    return DDIMSampler(model)
 
 
 def make_batch_sd(
@@ -67,12 +66,11 @@ def paint(sampler, image, prompt, seed, scale, h, w, steps, num_samples=1, callb
     wm = "SDV2"
     wm_encoder = WatermarkEncoder()
     wm_encoder.set_watermark('bytes', wm.encode('utf-8'))
-    with torch.no_grad(),\
-            torch.autocast("cuda"):
+    with (torch.no_grad(), torch.autocast("cuda")):
         batch = make_batch_sd(
             image, txt=prompt, device=device, num_samples=num_samples)
         c = model.cond_stage_model.encode(batch["txt"])
-        c_cat = list()
+        c_cat = []
         if isinstance(model, LatentUpscaleFinetuneDiffusion):
             for ck in model.concat_keys:
                 cc = batch[ck]
@@ -122,9 +120,13 @@ def paint(sampler, image, prompt, seed, scale, h, w, steps, num_samples=1, callb
 def pad_image(input_image):
     pad_w, pad_h = np.max(((2, 2), np.ceil(
         np.array(input_image.size) / 64).astype(int)), axis=0) * 64 - input_image.size
-    im_padded = Image.fromarray(
-        np.pad(np.array(input_image), ((0, pad_h), (0, pad_w), (0, 0)), mode='edge'))
-    return im_padded
+    return Image.fromarray(
+        np.pad(
+            np.array(input_image),
+            ((0, pad_h), (0, pad_w), (0, 0)),
+            mode='edge',
+        )
+    )
 
 
 def predict(input_image, prompt, steps, num_samples, scale, seed, eta, noise_level):
@@ -135,18 +137,19 @@ def predict(input_image, prompt, steps, num_samples, scale, seed, eta, noise_lev
     noise_level = torch.Tensor(
         num_samples * [noise_level]).to(sampler.model.device).long()
     sampler.make_schedule(steps, ddim_eta=eta, verbose=True)
-    result = paint(
+    return paint(
         sampler=sampler,
         image=image,
         prompt=prompt,
         seed=seed,
         scale=scale,
-        h=height, w=width, steps=steps,
+        h=height,
+        w=width,
+        steps=steps,
         num_samples=num_samples,
         callback=None,
-        noise_level=noise_level
+        noise_level=noise_level,
     )
-    return result
 
 
 sampler = initialize_model(sys.argv[1], sys.argv[2])
