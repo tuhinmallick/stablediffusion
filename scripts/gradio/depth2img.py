@@ -24,8 +24,7 @@ def initialize_model(config, ckpt):
     device = torch.device(
         "cuda") if torch.cuda.is_available() else torch.device("cpu")
     model = model.to(device)
-    sampler = DDIMSampler(model)
-    return sampler
+    return DDIMSampler(model)
 
 
 def make_batch_sd(
@@ -64,14 +63,13 @@ def paint(sampler, image, prompt, t_enc, seed, scale, num_samples=1, callback=No
     wm_encoder = WatermarkEncoder()
     wm_encoder.set_watermark('bytes', wm.encode('utf-8'))
 
-    with torch.no_grad(),\
-            torch.autocast("cuda"):
+    with (torch.no_grad(), torch.autocast("cuda")):
         batch = make_batch_sd(
             image, txt=prompt, device=device, num_samples=num_samples)
         z = model.get_first_stage_encoding(model.encode_first_stage(
             batch[model.first_stage_key]))  # move to latent space
         c = model.cond_stage_model.encode(batch["txt"])
-        c_cat = list()
+        c_cat = []
         for ck in model.concat_keys:
             cc = batch[ck]
             cc = model.depth_model(cc)
@@ -115,9 +113,13 @@ def paint(sampler, image, prompt, t_enc, seed, scale, num_samples=1, callback=No
 def pad_image(input_image):
     pad_w, pad_h = np.max(((2, 2), np.ceil(
         np.array(input_image.size) / 64).astype(int)), axis=0) * 64 - input_image.size
-    im_padded = Image.fromarray(
-        np.pad(np.array(input_image), ((0, pad_h), (0, pad_w), (0, 0)), mode='edge'))
-    return im_padded
+    return Image.fromarray(
+        np.pad(
+            np.array(input_image),
+            ((0, pad_h), (0, pad_w), (0, 0)),
+            mode='edge',
+        )
+    )
 
 
 def predict(input_image, prompt, steps, num_samples, scale, seed, eta, strength):
@@ -128,7 +130,7 @@ def predict(input_image, prompt, steps, num_samples, scale, seed, eta, strength)
     assert 0. <= strength <= 1., 'can only work with strength in [0.0, 1.0]'
     do_full_sample = strength == 1.
     t_enc = min(int(strength * steps), steps-1)
-    result = paint(
+    return paint(
         sampler=sampler,
         image=image,
         prompt=prompt,
@@ -137,9 +139,8 @@ def predict(input_image, prompt, steps, num_samples, scale, seed, eta, strength)
         scale=scale,
         num_samples=num_samples,
         callback=None,
-        do_full_sample=do_full_sample
+        do_full_sample=do_full_sample,
     )
-    return result
 
 
 sampler = initialize_model(sys.argv[1], sys.argv[2])

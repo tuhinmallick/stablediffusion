@@ -33,9 +33,7 @@ def initialize_model(config, ckpt):
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     model = model.to(device)
-    sampler = DDIMSampler(model)
-
-    return sampler
+    return DDIMSampler(model)
 
 
 def make_batch_sd(
@@ -57,13 +55,18 @@ def make_batch_sd(
 
     masked_image = image * (mask < 0.5)
 
-    batch = {
-        "image": repeat(image.to(device=device), "1 ... -> n ...", n=num_samples),
+    return {
+        "image": repeat(
+            image.to(device=device), "1 ... -> n ...", n=num_samples
+        ),
         "txt": num_samples * [txt],
-        "mask": repeat(mask.to(device=device), "1 ... -> n ...", n=num_samples),
-        "masked_image": repeat(masked_image.to(device=device), "1 ... -> n ...", n=num_samples),
+        "mask": repeat(
+            mask.to(device=device), "1 ... -> n ...", n=num_samples
+        ),
+        "masked_image": repeat(
+            masked_image.to(device=device), "1 ... -> n ...", n=num_samples
+        ),
     }
-    return batch
 
 
 def inpaint(sampler, image, mask, prompt, seed, scale, ddim_steps, num_samples=1, w=512, h=512, eta=1.):
@@ -79,48 +82,47 @@ def inpaint(sampler, image, mask, prompt, seed, scale, ddim_steps, num_samples=1
     start_code = prng.randn(num_samples, 4, h // 8, w // 8)
     start_code = torch.from_numpy(start_code).to(device=device, dtype=torch.float32)
 
-    with torch.no_grad(), \
-            torch.autocast("cuda"):
-            batch = make_batch_sd(image, mask, txt=prompt, device=device, num_samples=num_samples)
+    with (torch.no_grad(), torch.autocast("cuda")):
+        batch = make_batch_sd(image, mask, txt=prompt, device=device, num_samples=num_samples)
 
-            c = model.cond_stage_model.encode(batch["txt"])
+        c = model.cond_stage_model.encode(batch["txt"])
 
-            c_cat = list()
-            for ck in model.concat_keys:
-                cc = batch[ck].float()
-                if ck != model.masked_image_key:
-                    bchw = [num_samples, 4, h // 8, w // 8]
-                    cc = torch.nn.functional.interpolate(cc, size=bchw[-2:])
-                else:
-                    cc = model.get_first_stage_encoding(model.encode_first_stage(cc))
-                c_cat.append(cc)
-            c_cat = torch.cat(c_cat, dim=1)
+        c_cat = []
+        for ck in model.concat_keys:
+            cc = batch[ck].float()
+            if ck != model.masked_image_key:
+                bchw = [num_samples, 4, h // 8, w // 8]
+                cc = torch.nn.functional.interpolate(cc, size=bchw[-2:])
+            else:
+                cc = model.get_first_stage_encoding(model.encode_first_stage(cc))
+            c_cat.append(cc)
+        c_cat = torch.cat(c_cat, dim=1)
 
-            # cond
-            cond = {"c_concat": [c_cat], "c_crossattn": [c]}
+        # cond
+        cond = {"c_concat": [c_cat], "c_crossattn": [c]}
 
-            # uncond cond
-            uc_cross = model.get_unconditional_conditioning(num_samples, "")
-            uc_full = {"c_concat": [c_cat], "c_crossattn": [uc_cross]}
+        # uncond cond
+        uc_cross = model.get_unconditional_conditioning(num_samples, "")
+        uc_full = {"c_concat": [c_cat], "c_crossattn": [uc_cross]}
 
-            shape = [model.channels, h // 8, w // 8]
-            samples_cfg, intermediates = sampler.sample(
-                ddim_steps,
-                num_samples,
-                shape,
-                cond,
-                verbose=False,
-                eta=eta,
-                unconditional_guidance_scale=scale,
-                unconditional_conditioning=uc_full,
-                x_T=start_code,
-            )
-            x_samples_ddim = model.decode_first_stage(samples_cfg)
+        shape = [model.channels, h // 8, w // 8]
+        samples_cfg, intermediates = sampler.sample(
+            ddim_steps,
+            num_samples,
+            shape,
+            cond,
+            verbose=False,
+            eta=eta,
+            unconditional_guidance_scale=scale,
+            unconditional_conditioning=uc_full,
+            x_T=start_code,
+        )
+        x_samples_ddim = model.decode_first_stage(samples_cfg)
 
-            result = torch.clamp((x_samples_ddim + 1.0) / 2.0,
-                                 min=0.0, max=1.0)
+        result = torch.clamp((x_samples_ddim + 1.0) / 2.0,
+                             min=0.0, max=1.0)
 
-            result = result.cpu().numpy().transpose(0, 2, 3, 1) * 255
+        result = result.cpu().numpy().transpose(0, 2, 3, 1) * 255
     return [put_watermark(Image.fromarray(img.astype(np.uint8)), wm_encoder) for img in result]
 
 
@@ -129,8 +131,7 @@ def run():
 
     sampler = initialize_model(sys.argv[1], sys.argv[2])
 
-    image = st.file_uploader("Image", ["jpg", "png"])
-    if image:
+    if image := st.file_uploader("Image", ["jpg", "png"]):
         image = Image.open(image)
         w, h = image.size
         print(f"loaded input image of size ({w}, {h})")
@@ -157,7 +158,7 @@ def run():
         st.write("Canvas")
         st.caption(
             "Draw a mask to inpaint, then click the 'Send to Streamlit' button (bottom left, with an arrow on it).")
-        canvas_result = st_canvas(
+        if canvas_result := st_canvas(
             fill_color=fill_color,
             stroke_width=stroke_width,
             stroke_color=stroke_color,
@@ -168,8 +169,7 @@ def run():
             width=width,
             drawing_mode=drawing_mode,
             key="canvas",
-        )
-        if canvas_result:
+        ):
             mask = canvas_result.image_data
             mask = mask[:, :, -1] > 0
             if mask.sum() > 0:

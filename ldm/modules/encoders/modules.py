@@ -81,8 +81,7 @@ class FrozenT5Embedder(AbstractEncoder):
         tokens = batch_encoding["input_ids"].to(self.device)
         outputs = self.transformer(input_ids=tokens)
 
-        z = outputs.last_hidden_state
-        return z
+        return outputs.last_hidden_state
 
     def encode(self, text):
         return self(text)
@@ -124,12 +123,11 @@ class FrozenCLIPEmbedder(AbstractEncoder):
         tokens = batch_encoding["input_ids"].to(self.device)
         outputs = self.transformer(input_ids=tokens, output_hidden_states=self.layer == "hidden")
         if self.layer == "last":
-            z = outputs.last_hidden_state
+            return outputs.last_hidden_state
         elif self.layer == "pooled":
-            z = outputs.pooler_output[:, None, :]
+            return outputs.pooler_output[:, None, :]
         else:
-            z = outputs.hidden_states[self.layer_idx]
-        return z
+            return outputs.hidden_states[self.layer_idx]
 
     def encode(self, text):
         return self(text)
@@ -160,9 +158,7 @@ class ClipImageEmbedder(nn.Module):
                                    interpolation='bicubic', align_corners=True,
                                    antialias=self.antialias)
         x = (x + 1.) / 2.
-        # re-normalize according to clip
-        x = kornia.enhance.normalize(x, self.mean, self.std)
-        return x
+        return kornia.enhance.normalize(x, self.mean, self.std)
 
     def forward(self, x, no_dropout=False):
         # x is assumed to be in range [-1,1]
@@ -210,8 +206,7 @@ class FrozenOpenCLIPEmbedder(AbstractEncoder):
 
     def forward(self, text):
         tokens = open_clip.tokenize(text)
-        z = self.encode_with_transformer(tokens.to(self.device))
-        return z
+        return self.encode_with_transformer(tokens.to(self.device))
 
     def encode_with_transformer(self, text):
         x = self.model.token_embedding(text)  # [batch_size, n_ctx, d_model]
@@ -256,8 +251,6 @@ class FrozenOpenCLIPImageEmbedder(AbstractEncoder):
         self.layer = layer
         if self.layer == "penultimate":
             raise NotImplementedError()
-            self.layer_idx = 1
-
         self.antialias = antialias
 
         self.register_buffer('mean', torch.Tensor([0.48145466, 0.4578275, 0.40821073]), persistent=False)
@@ -270,9 +263,7 @@ class FrozenOpenCLIPImageEmbedder(AbstractEncoder):
                                    interpolation='bicubic', align_corners=True,
                                    antialias=self.antialias)
         x = (x + 1.) / 2.
-        # renormalize according to clip
-        x = kornia.enhance.normalize(x, self.mean, self.std)
-        return x
+        return kornia.enhance.normalize(x, self.mean, self.std)
 
     def freeze(self):
         self.model = self.model.eval()
@@ -288,8 +279,7 @@ class FrozenOpenCLIPImageEmbedder(AbstractEncoder):
 
     def encode_with_vision_transformer(self, img):
         img = self.preprocess(img)
-        x = self.model.visual(img)
-        return x
+        return self.model.visual(img)
 
     def encode(self, text):
         return self(text)

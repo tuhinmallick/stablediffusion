@@ -179,11 +179,7 @@ class PriorTransformer(nn.Module):
             xf_layers,
             xf_heads,
         )
-        if xf_final_ln:
-            self.final_ln = LayerNorm(xf_width)
-        else:
-            self.final_ln = None
-
+        self.final_ln = LayerNorm(xf_width) if xf_final_ln else None
         self.positional_embedding = nn.Parameter(
             th.empty(1, text_ctx + self.ext_len, xf_width)
         )

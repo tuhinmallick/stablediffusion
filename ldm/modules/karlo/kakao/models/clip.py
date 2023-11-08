@@ -93,11 +93,11 @@ class CustomizedCLIP(CLIP):
         else:
             counts: list = [
                 len(
-                    set(
+                    {
                         k.split(".")[2]
                         for k in state_dict
                         if k.startswith(f"visual.layer{b}")
-                    )
+                    }
                 )
                 for b in [1, 2, 3, 4]
             ]
@@ -119,11 +119,11 @@ class CustomizedCLIP(CLIP):
         transformer_width = state_dict["ln_final.weight"].shape[0]
         transformer_heads = transformer_width // 64
         transformer_layers = len(
-            set(
+            {
                 k.split(".")[2]
                 for k in state_dict
                 if k.startswith("transformer.resblocks")
-            )
+            }
         )
 
         model = cls(

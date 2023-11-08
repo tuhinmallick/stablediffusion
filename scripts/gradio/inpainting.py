@@ -33,9 +33,7 @@ def initialize_model(config, ckpt):
     device = torch.device(
         "cuda") if torch.cuda.is_available() else torch.device("cpu")
     model = model.to(device)
-    sampler = DDIMSampler(model)
-
-    return sampler
+    return DDIMSampler(model)
 
 
 def make_batch_sd(
@@ -57,13 +55,18 @@ def make_batch_sd(
 
     masked_image = image * (mask < 0.5)
 
-    batch = {
-        "image": repeat(image.to(device=device), "1 ... -> n ...", n=num_samples),
+    return {
+        "image": repeat(
+            image.to(device=device), "1 ... -> n ...", n=num_samples
+        ),
         "txt": num_samples * [txt],
-        "mask": repeat(mask.to(device=device), "1 ... -> n ...", n=num_samples),
-        "masked_image": repeat(masked_image.to(device=device), "1 ... -> n ...", n=num_samples),
+        "mask": repeat(
+            mask.to(device=device), "1 ... -> n ...", n=num_samples
+        ),
+        "masked_image": repeat(
+            masked_image.to(device=device), "1 ... -> n ...", n=num_samples
+        ),
     }
-    return batch
 
 
 def inpaint(sampler, image, mask, prompt, seed, scale, ddim_steps, num_samples=1, w=512, h=512):
@@ -81,14 +84,13 @@ def inpaint(sampler, image, mask, prompt, seed, scale, ddim_steps, num_samples=1
     start_code = torch.from_numpy(start_code).to(
         device=device, dtype=torch.float32)
 
-    with torch.no_grad(), \
-            torch.autocast("cuda"):
+    with (torch.no_grad(), torch.autocast("cuda")):
         batch = make_batch_sd(image, mask, txt=prompt,
                               device=device, num_samples=num_samples)
 
         c = model.cond_stage_model.encode(batch["txt"])
 
-        c_cat = list()
+        c_cat = []
         for ck in model.concat_keys:
             cc = batch[ck].float()
             if ck != model.masked_image_key:
@@ -130,9 +132,13 @@ def inpaint(sampler, image, mask, prompt, seed, scale, ddim_steps, num_samples=1
 def pad_image(input_image):
     pad_w, pad_h = np.max(((2, 2), np.ceil(
         np.array(input_image.size) / 64).astype(int)), axis=0) * 64 - input_image.size
-    im_padded = Image.fromarray(
-        np.pad(np.array(input_image), ((0, pad_h), (0, pad_w), (0, 0)), mode='edge'))
-    return im_padded
+    return Image.fromarray(
+        np.pad(
+            np.array(input_image),
+            ((0, pad_h), (0, pad_w), (0, 0)),
+            mode='edge',
+        )
+    )
 
 def predict(input_image, prompt, ddim_steps, num_samples, scale, seed):
     init_image = input_image["image"].convert("RGB")
@@ -142,7 +148,7 @@ def predict(input_image, prompt, ddim_steps, num_samples, scale, seed):
     width, height = image.size
     print("Inpainting...", width, height)
 
-    result = inpaint(
+    return inpaint(
         sampler=sampler,
         image=image,
         mask=mask,
@@ -151,10 +157,9 @@ def predict(input_image, prompt, ddim_steps, num_samples, scale, seed):
         scale=scale,
         ddim_steps=ddim_steps,
         num_samples=num_samples,
-        h=height, w=width
+        h=height,
+        w=width,
     )
-
-    return result
 
 
 sampler = initialize_model(sys.argv[1], sys.argv[2])
